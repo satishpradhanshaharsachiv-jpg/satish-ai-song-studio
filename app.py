@@ -1,18 +1,17 @@
 import streamlit as st
-import google.generativeai as genai
 import json
 import os
 import urllib.parse
 from datetime import datetime
 
-# १. पेज सेटिंग्ज आणि RTI ॲपसारखे मॉडर्न कॉम्पॅक्ट डिझाइन
+# १. पेज सेटिंग्ज
 st.set_page_config(page_title="Satish AI Song Studio Pro", page_icon="🎵", layout="centered")
 
-# ॲडमिन मास्टर पिन (गाणे अनलॉक करण्यासाठी आणि ॲडमिन डॅशबोर्ड उघडण्यासाठी)
-ADMIN_SECRET_PIN = "7788"
-DB_FILE = "song_studio_users_db.json"
+# मास्टर ॲडमिन सिक्रेट पिन (५५० किंवा ७७८८)
+ADMIN_SECRET_PIN = "550"
+DB_FILE = "song_studio_portal_db.json"
 
-# डेटाबेस लोड व सेव्ह फंक्शन
+# डेटाबेस फंक्शन्स
 def load_db():
     if os.path.exists(DB_FILE):
         try:
@@ -22,12 +21,25 @@ def load_db():
             return []
     return []
 
-def save_to_db(user_data):
-    db = load_db()
-    db.append(user_data)
+def save_to_db(all_data):
     with open(DB_FILE, "w", encoding="utf-8") as f:
-        json.dump(db, f, ensure_ascii=False, indent=2)
+        json.dump(all_data, f, ensure_ascii=False, indent=2)
 
+def add_user_record(user_dict):
+    db = load_db()
+    db.append(user_dict)
+    save_to_db(db)
+
+def update_user_status(record_id, new_status, admin_msg=""):
+    db = load_db()
+    for item in db:
+        if item.get("id") == record_id:
+            item["status"] = new_status
+            if admin_msg:
+                item["admin_reply"] = admin_msg
+    save_to_db(db)
+
+# २. कॉम्पॅक्ट व मॉडर्न CSS
 custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700;800&display=swap');
@@ -39,12 +51,11 @@ custom_css = """
 div[class^="viewerBadge"] { visibility: hidden; display: none !important; }
 button[title="View source"] { display: none; }
 
-/* अक्षरांची साईझ सुटसुटीत व कॉम्पॅक्ट */
-h1 { color: #1E3A8A; font-weight: 800; text-align: center; font-size: 22px; margin-bottom: 0px; }
+h1 { color: #1E3A8A; font-weight: 800; text-align: center; font-size: 22px; margin-bottom: 2px; }
 h2, h3 { font-size: 16px !important; font-weight: 700 !important; }
 p, label, span { font-size: 13px !important; }
 
-/* RTI ॲपसारखी मोठी चमकदार रंगीत बटने */
+/* मुख्य ४ चमकदार बटने */
 div.st-key-btn_bhim button {
     background: linear-gradient(135deg, #1E40AF, #3B82F6) !important;
     color: #ffffff !important; height: 60px !important; border-radius: 12px !important;
@@ -78,7 +89,8 @@ div.st-key-btn_other button p { font-size: 14px !important; font-weight: 800 !im
 """
 st.markdown(custom_css, unsafe_allow_html=True)
 
-# सेशन स्टेट व्हेरिएबल्स
+# ३. सेशन स्टेट
+if 'view_mode' not in st.session_state: st.session_state.view_mode = "user_portal"
 if 'category' not in st.session_state: st.session_state.category = "bhim_geet"
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
 if 'user_phone' not in st.session_state: st.session_state.user_phone = ""
@@ -86,81 +98,125 @@ if 'sub_genre' not in st.session_state: st.session_state.sub_genre = "भीम�
 if 'voice_type' not in st.session_state: st.session_state.voice_type = "जोशपूर्ण पुरुष आवाज (Male Energy)"
 if 'custom_prompt' not in st.session_state: st.session_state.custom_prompt = ""
 if 'generated_lyrics' not in st.session_state: st.session_state.generated_lyrics = ""
-if 'suno_prompt' not in st.session_state: st.session_state.suno_prompt = ""
-if 'is_paid' not in st.session_state: st.session_state.is_paid = False
-if 'show_admin' not in st.session_state: st.session_state.show_admin = False
+if 'current_order_id' not in st.session_state: st.session_state.current_order_id = ""
 
-# शीर्ष शीर्षक
-st.markdown("<h1>🎵 Satish AI Song Studio Pro</h1>", unsafe_allow_html=True)
+# शीर्षक
+st.markdown("<h1>🎵 Satish AI Song Studio & Portal</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #4B5563; font-weight: bold; margin-bottom: 8px;'>स्वतःचे नाव जोडून १ सेकंदात बनवा कडक डीजे, रॅप, भीमगीते व भक्तीगीते!</p>", unsafe_allow_html=True)
 st.markdown("---")
 
-# मुख्य ४ संगीत वर्ग बटने (Main Category Buttons)
-c1, c2 = st.columns(2)
-with c1:
-    if st.button("💙 १. डॉ. बाबासाहेब व बुद्ध गीते\n(भीमगीत स्पेशल)", key="btn_bhim"):
-        st.session_state.category = "bhim_geet"
-with c2:
-    if st.button("🔥 २. डीजे, ढोल-ताशे व डान्स\n(सॅड/गम + डीजे मिक्स)", key="btn_dj"):
-        st.session_state.category = "dj_remix"
-
-c3, c4 = st.columns(2)
-with c3:
-    if st.button("🎤 ३. अस्सल मराठी रॅप\n(स्ट्रीट / इमोशनल / स्वॅग)", key="btn_rap"):
-        st.session_state.category = "marathi_rap"
-with c4:
-    if st.button("🎂 ४. वाढदिवस, भक्ती व इतर\n(सर्व देव, आई-बाबा, पार्टी)", key="btn_other"):
-        st.session_state.category = "birthday_bhakti"
-
-st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
-
-# उप-नेव्हिगेशन (डॅशबोर्ड, रिसेट)
-n1, n2 = st.columns(2)
-with n1:
+# वरचे नेव्हिगेशन
+col_nav1, col_nav2 = st.columns(2)
+with col_nav1:
     st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-    if st.button("🔄 नवीन गाणे तयार करा"):
-        st.session_state.user_name = ""
-        st.session_state.custom_prompt = ""
-        st.session_state.generated_lyrics = ""
-        st.session_state.suno_prompt = ""
-        st.session_state.is_paid = False
-        st.session_state.show_admin = False
+    if st.button("🎤 ग्राहक गाणे पोर्टल (Client Portal)"):
+        st.session_state.view_mode = "user_portal"
         st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-with n2:
+with col_nav2:
     st.markdown('<div class="nav-btn">', unsafe_allow_html=True)
-    if st.button("🔒 ॲडमिन डॅशबोर्ड (हिस्ट्री)"):
-        st.session_state.show_admin = not st.session_state.show_admin
+    if st.button("🔐 मास्टर ॲडमिन डॅशबोर्ड (Control 550)"):
+        st.session_state.view_mode = "admin_dashboard"
+        st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
-api_key = st.sidebar.text_input("🔑 Gemini API Key (ऐच्छिक):", type="password")
+st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
 
-# ==================== ॲडमिन डॅशबोर्ड (Analytics & User Tracking) ====================
-if st.session_state.show_admin:
+# ==============================================================================
+#                      विभाग १: मास्टर ॲडमिन डॅशबोर्ड
+# ==============================================================================
+if st.session_state.view_mode == "admin_dashboard":
     st.markdown("""
     <div style="background: #FEF3C7; border: 2px solid #F59E0B; padding: 12px; border-radius: 10px; margin-bottom: 12px;">
-        <h4 style="margin: 0; color: #92400E;">🔐 ॲडमिन पडताळणी व सर्व युजर्स हिस्ट्री</h4>
+        <h4 style="margin: 0; color: #92400E;">🔐 मास्टर ॲडमिन कंट्रोल डॅशबोर्ड (Admin Master 550)</h4>
+        <p style="margin: 3px 0 0 0; font-size: 12px; color: #78350F;">येथून तुम्ही सर्व ग्राहकांचे अर्ज तपासू शकता, मंजूर/नामंजूर करू शकता व थेट रिप्लाय देऊ शकता.</p>
     </div>
     """, unsafe_allow_html=True)
-    admin_pin = st.text_input("ॲडमिन सिक्रेट पिन टाका:", type="password", key="admin_pin_input")
-    if admin_pin == ADMIN_SECRET_PIN:
-        db_data = load_db()
-        st.success(f"✅ ॲडमिन लॉगिन यशस्वी! एकूण गाणी तयार झाली: {len(db_data)}")
-        if db_data:
-            for idx, user in enumerate(reversed(db_data)):
-                with st.expander(f"👤 {user.get('name', 'N/A')} ({user.get('phone', 'N/A')}) - {user.get('category')} [{user.get('time')}]"):
-                    st.write(f"**म्युझिक प्रकार:** {user.get('sub_genre')}")
-                    st.write(f"**व्हॉइस:** {user.get('voice')}")
-                    st.write(f"**युझरची संकल्पना:** {user.get('prompt')}")
-                    st.text_area(f"तयार झालेले बोल #{idx+1}:", value=user.get('lyrics', ''), height=150)
-        else:
-            st.info("अद्याप कोणत्याही युझरने गाणे तयार केलेले नाही.")
-    else:
-        if admin_pin: st.error("चुकीचा ॲडमिन पिन!")
 
-# ==================== मुख्य गाणे निर्मिती फॉर्म ====================
-if not st.session_state.show_admin:
+    admin_pass = st.text_input("मास्टर पिन प्रविष्ट करा:", type="password", key="admin_pin_box", placeholder="पिन: 550")
+
+    if admin_pass == ADMIN_SECRET_PIN:
+        db_records = load_db()
+        st.success(f"✅ ॲडमिन अधिकृत लॉगिन झाले! एकूण नोंदणीकृत ग्राहक/गाणी: {len(db_records)}")
+
+        if not db_records:
+            st.info("अद्याप कोणत्याही युझरने ऑर्डर किंवा गाणे सबमिट केलेले नाही.")
+        else:
+            for idx, item in enumerate(reversed(db_records)):
+                rec_id = item.get("id", f"REC_{idx}")
+                status = item.get("status", "Pending / पडताळणी बाकी")
+                
+                # स्टेटस रंग
+                if "Approved" in status or "स्वीकृत" in status:
+                    badge = "🟢 स्वीकृत (Approved)"
+                elif "Rejected" in status or "नाकारले" in status:
+                    badge = "🔴 नाकारले (Rejected)"
+                else:
+                    badge = "🟡 प्रलंबित (Pending)"
+
+                with st.expander(f"{badge} | 👤 {item.get('name')} ({item.get('phone')}) - {item.get('category')} [{item.get('time')}]"):
+                    st.write(f"**ऑर्डर आयडी:** `{rec_id}`")
+                    st.write(f"**संगीत प्रकार:** {item.get('sub_genre')}")
+                    st.write(f"**गायक आवाज:** {item.get('voice')}")
+                    st.write(f"**ग्राहकाची संकल्पना:** {item.get('prompt')}")
+                    st.text_area(f"गाण्याचे बोल (Lyrics #{idx+1}):", value=item.get('lyrics', ''), height=130, key=f"lyr_{idx}")
+
+                    # ॲडमिन ॲक्शन: मंजूर / नामंजूर आणि रिप्लाय
+                    st.markdown("---")
+                    st.markdown("##### ⚡ ॲडमिन निर्णय व थेट रिप्लाय:")
+                    
+                    rep_msg = st.text_input(f"ग्राहकाला द्यायचा रिप्लाय / मेसेज:", value=item.get('admin_reply', 'तुमचे गाणे तपासून तयार झाले आहे.'), key=f"msg_{idx}")
+                    
+                    act1, act2, act3 = st.columns(3)
+                    with act1:
+                        if st.button(f"✅ स्वीकृत करा (Approve)", key=f"app_{idx}"):
+                            update_user_status(rec_id, "Approved / स्वीकृत", rep_msg)
+                            st.success("गाणे मंजूर झाले!")
+                            st.rerun()
+                    with act2:
+                        if st.button(f"❌ नामंजूर करा (Reject)", key=f"rej_{idx}"):
+                            update_user_status(rec_id, "Rejected / नाकारले", rep_msg)
+                            st.error("गाणे नाकारले!")
+                            st.rerun()
+                    with act3:
+                        # थेट ग्राहकाला WhatsApp पाठवा
+                        wa_reply_text = urllib.parse.quote(f"नमस्कार {item.get('name')}, Satish AI Song Studio कडून अपडेट: {rep_msg} (ऑर्डर आयडी: {rec_id})")
+                        wa_link = f"https://api.whatsapp.com/send?phone=91{item.get('phone')}&text={wa_reply_text}"
+                        st.markdown(f"""
+                        <a href="{wa_link}" target="_blank" style="text-decoration:none;">
+                            <div style="background:#25D366; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px;">
+                                📲 WhatsApp रिप्लाय द्या
+                            </div>
+                        </a>
+                        """, unsafe_allow_html=True)
+    else:
+        if admin_pass:
+            st.error("चुकीचा मास्टर पिन! योग्य ५५० पिन टाका.")
+
+# ==============================================================================
+#                      विभाग २: ग्राहक गाणे निर्मिती पोर्टल
+# ==============================================================================
+else:
+    # मुख्य ४ चमकदार संगीत वर्ग बटने
+    c1, c2 = st.columns(2)
+    with c1:
+        if st.button("💙 १. डॉ. बाबासाहेब व बुद्ध गीते\n(भीमगीत स्पेशल)", key="btn_bhim"):
+            st.session_state.category = "bhim_geet"
+    with c2:
+        if st.button("🔥 २. डीजे, ढोल-ताशे व डान्स\n(सॅड/गम + डीजे मिक्स)", key="btn_dj"):
+            st.session_state.category = "dj_remix"
+
+    c3, c4 = st.columns(2)
+    with c3:
+        if st.button("🎤 ३. अस्सल मराठी रॅप\n(स्ट्रीट / इमोशनल / स्वॅग)", key="btn_rap"):
+            st.session_state.category = "marathi_rap"
+    with c4:
+        if st.button("🎂 ४. वाढदिवस, भक्ती व इतर\n(सर्व देव, आई-बाबा, पार्टी)", key="btn_other"):
+            st.session_state.category = "birthday_bhakti"
+
+    st.markdown("<div style='margin-top: 6px;'></div>", unsafe_allow_html=True)
+
     # कॅटेगरीनुसार उप-प्रकार
     if st.session_state.category == "bhim_geet":
         header_title = "💙 डॉ. बाबासाहेब आंबेडकर व तथागत बुद्ध स्पेशल गाणी"
@@ -227,123 +283,118 @@ if not st.session_state.show_admin:
         placeholder="उदा. गाण्यात निळ्या झेंड्याचा उल्लेख असावा, भावाच्या वाढदिवसाला कडक डीजे लावला आहे..."
     )
 
+    # ऑडिओ किंवा रेफरन्स डॉक्युमेंट अपलोड पर्याय (फायनान्स ॲपसारखा)
+    uploaded_file = st.file_uploader("तुमचा स्वतःचा व्हॉइस सॅम्पल किंवा संदर्भ फाईल अपलोड करा (ऐच्छिक):", type=["mp3", "wav", "m4a", "txt", "png", "jpg"])
+
     if st.button("🚀 एआय द्वारे सुपरहीट गाणे तयार करा"):
         if not st.session_state.user_name:
             st.warning("कृपया गाण्यासाठी नाव प्रविष्ट करा.")
         else:
-            with st.spinner("AI द्वारे कडक चाल, बोल आणि म्युझिक कम्पोझ होत आहे..."):
-                if api_key:
-                    try:
-                        genai.configure(api_key=api_key)
-                        model = genai.GenerativeModel("gemini-1.5-flash")
-                        prompt_text = f"""
-तुम्ही महाराष्ट्रातील नंबर १ संगीतकार आणि गीतकार आहात.
-कॅटेगरी: {st.session_state.category}
-प्रकार: {st.session_state.sub_genre}
-नाव: {st.session_state.user_name}
-आवाज: {st.session_state.voice_type}
-खास सूचना: {st.session_state.custom_prompt}
+            with st.spinner("AI द्वारे कडक चाल, बोल आणि म्युझिक तयार होत आहे..."):
+                # स्मार्ट इनबिल्ट गीतकार इंजिन
+                u_name = st.session_state.user_name
+                s_genre = st.session_state.sub_genre
 
-नियम:
-१. गाण्याचे मुखडा, अंतरा १, अंतरा २, आणि हुक लाईन स्पष्ट मराठीत आणि गेय असावी.
-२. शेवटी AI म्युझिक जनरेटर (Suno AI) साठी इंग्रजी प्रॉम्प्ट तयार करून द्या.
-"""
-                        res = model.generate_content(prompt_text)
-                        st.session_state.generated_lyrics = res.text
-                    except Exception as e:
-                        st.error(f"त्रुटी: {e}")
-                else:
-                    # ऑफलाइन सुपरहीट टेम्पलेट
+                if "भीम" in s_genre or "बुद्ध" in s_genre:
                     st.session_state.generated_lyrics = f"""🎵 [मुखडा - Chorus]
 (नाद घुमतो डीजेचा, वाजतंय ढोल-ताशा...
-{st.session_state.user_name} चं नाव ऐकून भल्याभल्यांना बसतोय धसका!)
+{u_name} चं नाव ऐकून भल्याभल्यांना बसतोय धसका!)
 अरे निळं वादळ आलं... क्रांतीची मशाल पेटली!
-{st.session_state.user_name} च्या एन्ट्रीने अख्खी मैफल थरथर कापली!
+{u_name} च्या एन्ट्रीने अख्खी मैफल थरथर कापली!
 
 🔥 [अंतरा १ - Verse 1]
 भीमरायाचा विचार मनात, चालतो छाती ठोकून,
 कोणाच्या बापाला भीत नाही, जगतो मान झुकवून!
-एकच वादा... {st.session_state.user_name} दादा!
+एकच वादा... {u_name} दादा!
 नाद करायचा पण आमचा कुठं... डीजे वाजवा जोरात आता!
 
 ⚡ [हुक लाईन - Drop]
 (जय भीम बोला... जय बुद्ध बोला...
-{st.session_state.user_name} च्या नावाने निळा गुलाल उधळा!)"""
+{u_name} च्या नावाने निळा गुलाल उधळा!)"""
+                elif "रॅप" in s_genre:
+                    st.session_state.generated_lyrics = f"""🎤 [मराठी स्ट्रीट रॅप - {u_name}]
+(Beat Drops - Heavy 808 Bass)
+गली मोहल्ल्यात हवा कोणाची?
+अरे एकाच नावाची... {u_name} भावाची!
+शून्यातून विश्व निर्माण केलं, स्वतःच्या हिंमतीवर,
+कोणाची मक्तेदारी नाही, आमचं राज्य या रस्त्यावर!
+आवाज थेट काळजात घुमणार... {u_name} चं नाव आता जगभर गाजणार!"""
+                else:
+                    st.session_state.generated_lyrics = f"""🎵 [धमाकेदार डीजे ट्रॅक - {u_name}]
+(ढोल-ताशांचा गजर आणि डीजेचा कडक बेस!)
+आला रे आला बघा कोण आला...
+{u_name} च्या नावाने अवघा महाराष्ट्र डोलायला लागला!
+वाजवा डीजे, उडवा धुरळा... आजची रात्र फक्त आपल्या नावाची!"""
 
-                st.session_state.suno_prompt = f"Marathi {st.session_state.sub_genre}, energetic folk beat, powerful bass, Marathi live dhol tasha, high bpm DJ mix, clear vocals for {st.session_state.user_name}"
+                # युनिक ऑर्डर आयडी
+                order_id = f"SONG_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
+                st.session_state.current_order_id = order_id
 
-                # डेटाबेसमध्ये युझर आणि गाणे कायमस्वरूपी सेव्ह करणे
-                save_to_db({
-                    "name": st.session_state.user_name,
+                # डेटाबेसमध्ये कायमस्वरूपी नोंद
+                add_user_record({
+                    "id": order_id,
+                    "name": u_name,
                     "phone": st.session_state.user_phone,
                     "category": st.session_state.category,
-                    "sub_genre": st.session_state.sub_genre,
+                    "sub_genre": s_genre,
                     "voice": st.session_state.voice_type,
                     "prompt": st.session_state.custom_prompt,
                     "lyrics": st.session_state.generated_lyrics,
+                    "has_file": True if uploaded_file else False,
+                    "status": "Pending / पडताळणी चालू",
+                    "admin_reply": "अर्ज प्राप्त झाला आहे. ॲडमिन पडताळणी करत आहेत.",
                     "time": datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                 })
 
-    # ==================== गाण्याचे बोल, कमी आवाजातील ऑडिओ व ₹१९९ लॉक ====================
+    # ==================== निकाल, ऑडिओ व स्टेटस ====================
     if st.session_state.generated_lyrics:
-        st.success("✅ तुमचे गाणे आणि म्युझिक ट्रॅक यशस्वीरीत्या तयार झाले आहे!")
+        st.success(f"✅ गाणे तयार झाले! तुमची ऑर्डर आयडी: `{st.session_state.current_order_id}`")
         
-        # गाण्याचे बोल (काळा बॉक्स)
         st.markdown("<p style='font-weight: bold; margin-bottom: 2px;'>📜 तयार झालेले संपूर्ण गाणे:</p>", unsafe_allow_html=True)
         st.code(st.session_state.generated_lyrics, language="text")
 
-        # पायरी २: कमी आवाजातील सॅम्पल प्लेअर
+        # कमी आवाजातील सॅम्पल प्लेअर
         st.markdown("""
         <div style="background: #EFF6FF; border: 1px solid #BFDBFE; padding: 10px; border-radius: 8px; margin-top: 10px;">
-            <p style="margin: 0; font-weight: bold; color: #1E40AF;">🎧 सॅम्पल गाणे ऐका (कमी आवाजात डेमो प्रिव्ह्यू):</p>
+            <p style="margin: 0; font-weight: bold; color: #1E40AF;">🎧 सॅम्पल गाणे ऐका (कमी आवाजात प्रिव्ह्यू):</p>
         </div>
         """, unsafe_allow_html=True)
-        
-        # डेमो ऑडिओ प्लेअर (कमी आवाज प्री-सेट)
-        audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        st.audio(audio_url)
-        st.caption("💡 वरील प्लेअरमध्ये कमी आवाजात डेमो तयार आहे. ओरिजिनल हाय-बेस स्टुडिओ ट्रॅकसाठी खाली अनलॉक करा.")
+        st.audio("https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
 
-        # पायरी ३: ₹१९९ स्टुडिओ लॉक आणि डाऊनलोड
+        # ₹१९९ स्टुडिओ लॉक
         st.markdown("---")
-        st.markdown("### 📥 ओरिजिनल स्टुडिओ MP3 व फुल ऑडिओ डाऊनलोड")
+        st.markdown("### 📥 ओरिजिनल स्टुडिओ HD ट्रॅक डाऊनलोड")
+        st.info("🔒 **ओरिजिनल फुल-क्वालिटी HD ऑडिओ मिळवण्यासाठी ₹१९९ शुल्क आहे. पेमेंट झाल्यावर ॲडमिनकडून मिळालेला ५५० मास्टर पिन टाका.**")
+        
+        upi_id = "satishpradhan3392@ybl"
+        qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa={upi_id}%26pn=Satish%20Pradhan%26am=199%26cu=INR"
 
-        if not st.session_state.is_paid:
-            st.warning("🔒 **ओरिजिनल फुल-क्वालिटी HD गाणे डाऊनलोड करण्यासाठी ₹१९९ लॉक आहे.**")
-            upi_id = "satishpradhan3392@ybl"
-            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa={upi_id}%26pn=Satish%20Pradhan%26am=199%26cu=INR"
+        col_q1, col_q2 = st.columns([1, 2])
+        with col_q1:
+            st.image(qr_url, caption="₹१९९ स्कॅन करा", width=125)
+        with col_q2:
+            st.markdown(f"**UPI ID:** `{upi_id}` | **रक्कम:** ₹१९९/-")
+            unlock_pin_input = st.text_input("ॲडमिन अनलॉक पिन टाका:", type="password", key="client_unlock_pin")
+            if st.button("🔓 गाणे अनलॉक करा"):
+                if unlock_pin_input.strip() == ADMIN_SECRET_PIN:
+                    st.success("🎉 गाणे अनलॉक झाले आहे!")
+                    st.download_button(
+                        label="📥 ओरिजिनल गाणे डाऊनलोड करा (Text/MP3)",
+                        data=st.session_state.generated_lyrics.encode('utf-8'),
+                        file_name=f"{st.session_state.user_name}_song.txt",
+                        mime="text/plain"
+                    )
+                else:
+                    st.error("चुकीचा पिन! कृपया ॲडमिनशी संपर्क करा.")
 
-            col_q1, col_q2 = st.columns([1, 2])
-            with col_q1:
-                st.image(qr_url, caption="₹१९९ स्कॅन करा", width=125)
-            with col_q2:
-                st.markdown(f"**UPI ID:** `{upi_id}` | **रक्कम:** ₹१९९/-")
-                unlock_pin_input = st.text_input("पेमेंट झाल्यावर ॲडमिनकडून मिळालेला अनलॉक पिन टाका:", type="password", key="song_unlock_pin")
-                if st.button("🔓 गाणे अनलॉक करा व MP3 मिळवा"):
-                    if unlock_pin_input.strip() == ADMIN_SECRET_PIN:
-                        st.session_state.is_paid = True
-                        st.success("पडताळणी यशस्वी! गाणे अनलॉक झाले आहे.")
-                        st.rerun()
-                    else:
-                        st.error("चुकीचा पिन! कृपया ₹१९९ पेमेंट करून ॲडमिनकडून खरा पिन मिळवा.")
-            
-            # WhatsApp सपोर्ट बटण
-            wa_text = urllib.parse.quote(f"नमस्कार, मी Satish AI Song Studio वर गाणे तयार केले आहे. नाव: {st.session_state.user_name}, मला ₹१९९ चे गाणे अनलॉक करून हवे आहे.")
-            st.markdown(f"""
-            <div style="text-align: center; margin-top: 10px;">
-                <a href="https://api.whatsapp.com/send?phone=918668235395&text={wa_text}" target="_blank" style="text-decoration: none;">
-                    <div style="background: #25D366; color: white; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px;">
-                        📲 पेमेंट स्क्रीनशॉट पाठवून पिन मिळवण्यासाठी येथे WhatsApp करा
-                    </div>
-                </a>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            st.success("🎉 **अभिनंदन! तुमचे ओरिजिनल स्टुडिओ गाणे अनलॉक झाले आहे!**")
-            st.download_button(
-                label="📥 ओरिजिनल हाय-क्वालिटी MP3 गाणे डाऊनलोड करा",
-                data=st.session_state.generated_lyrics.encode('utf-8'),
-                file_name=f"{st.session_state.user_name}_song_track.txt",
-                mime="text/plain"
-            )
-            st.info("🎵 Suno AI / Udio AI मध्ये वापरण्यासाठी म्युझिक प्रॉम्प्ट: \n`" + st.session_state.suno_prompt + "`")
+        # WhatsApp सपोर्ट
+        wa_text = urllib.parse.quote(f"नमस्कार, मी Satish AI Song Studio वर गाणे तयार केले आहे. नाव: {st.session_state.user_name}, ऑर्डर आयडी: {st.session_state.current_order_id}, कृपया माझे गाणे अप्रूव्ह करा.")
+        st.markdown(f"""
+        <div style="text-align: center; margin-top: 12px;">
+            <a href="https://api.whatsapp.com/send?phone=918668235395&text={wa_text}" target="_blank" style="text-decoration: none;">
+                <div style="background: #25D366; color: white; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px;">
+                    📲 पेमेंट स्क्रीनशॉट पाठवण्यासाठी येथे WhatsApp करा
+                </div>
+            </a>
+        </div>
+        """, unsafe_allow_html=True)
