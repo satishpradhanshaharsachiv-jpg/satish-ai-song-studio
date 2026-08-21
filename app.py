@@ -7,6 +7,9 @@ from datetime import datetime
 # १. पेज कॉन्फिगरेशन आणि कॉम्पॅक्ट डिझाइन
 st.set_page_config(page_title="Satish AI Song Studio Mega Pro", page_icon="🎵", layout="centered")
 
+# ॲपची अचूक व खरी लिंक
+CORRECT_APP_URL = "https://satish-ai-song-studio-iekebqdhhxmq6f2lycinyq.streamlit.app/"
+
 # मालकाची अधिकृत माहिती आणि मास्टर ५५० सिक्रेट की
 OWNER_EMAIL = "satishpradhan3392@gmail.com"
 OWNER_PHONE = "8668235395"
@@ -103,6 +106,39 @@ if 'order_id' not in st.session_state: st.session_state.order_id = ""
 # शीर्षक
 st.markdown("<h1>🎵 Satish AI Song Studio Mega Pro</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #4B5563; font-weight: bold; margin-bottom: 8px;'>३२०+ संगीत प्रकारात स्वतःचे नाव जोडून बनवा कडक डीजे, रॅप, भीमगीते व भक्तीगीते!</p>", unsafe_allow_html=True)
+
+# ==================== होम पेजवरील मुख्य शेअरिंग बटन्स ====================
+share_default_text = f"हे बघा! 'Satish AI Song Studio' वरून स्वतःच्या नावाचे आणि आवडीचे AI गाणे बनवा. तुम्ही पण ट्राय करा:\n{CORRECT_APP_URL}"
+encoded_share_default = urllib.parse.quote(share_default_text)
+
+st.markdown(f"""
+<div style="background: #F0FDF4; border: 1.5px solid #86EFAC; padding: 8px 12px; border-radius: 10px; margin-bottom: 12px; text-align: center;">
+    <p style="margin: 0 0 6px 0; font-weight: bold; color: #166534; font-size: 13px;">📲 मित्रांना ॲप शेअर करा (एका क्लिकवर पाठवा):</p>
+    <div style="display: flex; justify-content: center; gap: 8px; flex-wrap: wrap;">
+        <a href="https://api.whatsapp.com/send?text={encoded_share_default}" target="_blank" style="text-decoration:none;">
+            <span style="background:#25D366; color:white; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:12px; display:inline-block;">
+                📲 WhatsApp
+            </span>
+        </a>
+        <a href="https://www.facebook.com/sharer/sharer.php?u={CORRECT_APP_URL}" target="_blank" style="text-decoration:none;">
+            <span style="background:#1877F2; color:white; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:12px; display:inline-block;">
+                📘 Facebook
+            </span>
+        </a>
+        <a href="fb-messenger://share/?link={CORRECT_APP_URL}" target="_blank" style="text-decoration:none;">
+            <span style="background:#00B2FF; color:white; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:12px; display:inline-block;">
+                💬 Messenger
+            </span>
+        </a>
+        <a href="sms:?body={encoded_share_default}" target="_blank" style="text-decoration:none;">
+            <span style="background:#4B5563; color:white; padding:6px 14px; border-radius:6px; font-weight:bold; font-size:12px; display:inline-block;">
+                ✉️ SMS
+            </span>
+        </a>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
 st.markdown("---")
 
 # वरचे नेव्हिगेशन
@@ -389,7 +425,6 @@ else:
 {bday_text}
 वाजवा डीजे, उडवा धुरळा... आजची रात्र फक्त आपल्या नावाची!"""
 
-                # गाणे आवाजात वाचण्यासाठी स्वच्छ शब्द तयार करणे
                 st.session_state.clean_lyrics_speech = (
                     st.session_state.generated_lyrics
                     .replace("🎵", "").replace("🔥", "").replace("⚡", "").replace("🎤", "")
@@ -417,14 +452,13 @@ else:
                     "time": datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                 })
 
-    # ==================== निकाल, थेट गाणे प्लेअर, डाऊनलोड व सोशल मीडिया शेअर ====================
+    # निकाल, थेट गाणे प्लेअर, डाऊनलोड व शेअरिंग
     if st.session_state.generated_lyrics:
         st.success(f"✅ गाणे तयार झाले! तुमची ऑर्डर आयडी: `{st.session_state.order_id}`")
         
         st.markdown("<p style='font-weight: bold; margin-bottom: 2px;'>📜 तयार झालेले संपूर्ण गाणे:</p>", unsafe_allow_html=True)
         st.code(st.session_state.generated_lyrics, language="text")
 
-        # १. थेट गाणे जागेवर वाजवणारा स्मार्ट ऑडिओ प्लेअर (मराठी AI व्हॉइस + म्युझिक)
         st.markdown("""
         <div style="background: #EFF6FF; border: 2px solid #3B82F6; padding: 12px; border-radius: 10px; margin-top: 10px; text-align: center;">
             <p style="margin: 0 0 8px 0; font-weight: bold; color: #1E40AF; font-size: 15px;">🎧 तुमचे तयार झालेले गाणे थेट येथे ऐका (Live Voice Track):</p>
@@ -463,7 +497,7 @@ else:
         """
         st.components.v1.html(audio_player_html, height=130)
 
-        # २. १००% मोफत थेट डाऊनलोड पर्याय
+        # मोफत डाऊनलोड पर्याय
         st.markdown("---")
         st.markdown("### 📥 मोफत गाणे डाऊनलोड करा")
         d_col1, d_col2 = st.columns(2)
@@ -482,25 +516,24 @@ else:
                 mime="audio/mp3"
             )
 
-        # ३. सोशल मीडिया शेअरिंग (WhatsApp, Facebook, Messenger, SMS)
+        # तयार झालेले गाणे शेअर करण्याचे बटन्स
         st.markdown("---")
-        st.markdown("### 📲 सोशल मीडियावर मित्रांना पाठवा व शेअर करा")
+        st.markdown("### 📲 तुमचे तयार झालेले गाणे मित्रांना पाठवा")
 
-        app_share_url = "https://satish-ai-song-studio-iekebqdhhxmq6f2lycinyq.streamlit.app/"
-        share_msg = f"🎵 मी Satish AI Song Studio वरून स्वतःच्या नावाचे कडक गाणे बनवले आहे!\nनाव: {st.session_state.user_name}\nतुम्हीही तुमचे गाणे लगेच बनवा: {app_share_url}"
-        encoded_msg = urllib.parse.quote(share_msg)
+        user_song_share_text = f"🎵 मी Satish AI Song Studio वरून स्वतःच्या नावाचे कडक गाणे बनवले आहे!\nनाव: {st.session_state.user_name}\nतुम्हीही तुमचे गाणे लगेच बनवा: {CORRECT_APP_URL}"
+        encoded_user_share = urllib.parse.quote(user_song_share_text)
 
         sh1, sh2 = st.columns(2)
         with sh1:
             st.markdown(f"""
-            <a href="https://api.whatsapp.com/send?text={encoded_msg}" target="_blank" style="text-decoration:none;">
+            <a href="https://api.whatsapp.com/send?text={encoded_user_share}" target="_blank" style="text-decoration:none;">
                 <div style="background:#25D366; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; margin-bottom:8px;">
                     📲 WhatsApp वर पाठवा
                 </div>
             </a>
             """, unsafe_allow_html=True)
             st.markdown(f"""
-            <a href="https://www.facebook.com/sharer/sharer.php?u={app_share_url}" target="_blank" style="text-decoration:none;">
+            <a href="https://www.facebook.com/sharer/sharer.php?u={CORRECT_APP_URL}" target="_blank" style="text-decoration:none;">
                 <div style="background:#1877F2; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px;">
                     📘 Facebook वर शेअर करा
                 </div>
@@ -509,14 +542,14 @@ else:
 
         with sh2:
             st.markdown(f"""
-            <a href="fb-messenger://share/?link={app_share_url}&app_id=123456789" target="_blank" style="text-decoration:none;">
+            <a href="fb-messenger://share/?link={CORRECT_APP_URL}" target="_blank" style="text-decoration:none;">
                 <div style="background:#00B2FF; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px; margin-bottom:8px;">
                     💬 Messenger वर पाठवा
                 </div>
             </a>
             """, unsafe_allow_html=True)
             st.markdown(f"""
-            <a href="sms:?body={encoded_msg}" target="_blank" style="text-decoration:none;">
+            <a href="sms:?body={encoded_user_share}" target="_blank" style="text-decoration:none;">
                 <div style="background:#4B5563; color:white; padding:10px; border-radius:8px; text-align:center; font-weight:bold; font-size:14px;">
                     ✉️ साध्या SMS द्वारे पाठवा
                 </div>
