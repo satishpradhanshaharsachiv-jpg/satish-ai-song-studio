@@ -4,7 +4,7 @@ import os
 import urllib.parse
 from datetime import datetime
 
-# १. पेज कॉन्फिगरेशन आणि कॉम्पॅक्ट डिझाइन
+# १. पेज कॉन्फिगरेशन
 st.set_page_config(page_title="Satish AI Song Studio Mega Pro", page_icon="🎵", layout="centered")
 
 CORRECT_APP_URL = "https://satish-ai-song-studio-iekebqdhhxmq6f2lycinyq.streamlit.app/"
@@ -41,7 +41,14 @@ def update_order_status(order_id, status, reply_msg=""):
                 item["admin_reply"] = reply_msg
     save_to_db(db)
 
-# २. कॉम्पॅक्ट CSS डिझाइन
+def is_order_unlocked(order_id):
+    db = load_db()
+    for item in db:
+        if item.get("id") == order_id:
+            return item.get("status") == "Unlocked"
+    return False
+
+# २. कॉम्पॅक्ट CSS
 custom_css = """
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Mukta:wght@400;600;700;800;900&display=swap');
@@ -57,7 +64,6 @@ h1 { color: #1E3A8A; font-weight: 900; text-align: center; font-size: 22px; marg
 h2, h3 { font-size: 15px !important; font-weight: 800 !important; }
 p, label, span { font-size: 13px !important; }
 
-/* मुख्य ४ रंगीत मोठी बटने */
 div.st-key-btn_m1 button {
     background: linear-gradient(135deg, #1E40AF, #3B82F6) !important;
     color: #ffffff !important; height: 65px !important; border-radius: 12px !important;
@@ -97,14 +103,14 @@ if 'main_cat' not in st.session_state: st.session_state.main_cat = "mahapurush"
 if 'user_name' not in st.session_state: st.session_state.user_name = ""
 if 'user_phone' not in st.session_state: st.session_state.user_phone = ""
 if 'generated_lyrics' not in st.session_state: st.session_state.generated_lyrics = ""
-if 'suno_style_prompt' not in st.session_state: st.session_state.suno_style_prompt = ""
+if 'clean_lyrics_speech' not in st.session_state: st.session_state.clean_lyrics_speech = ""
 if 'order_id' not in st.session_state: st.session_state.order_id = ""
 
 # शीर्षक
 st.markdown("<h1>🎵 Satish AI Song Studio Mega Pro</h1>", unsafe_allow_html=True)
 st.markdown("<p style='text-align: center; color: #4B5563; font-weight: bold; margin-bottom: 8px;'>३२०+ संगीत प्रकारात स्वतःचे नाव जोडून बनवा कडक डीजे, रॅप, भीमगीते व भक्तीगीते!</p>", unsafe_allow_html=True)
 
-# मुख्य शेअरिंग बटन्स
+# होम पेजवरील शेअरिंग बटन्स
 share_default_text = f"हे बघा! 'Satish AI Song Studio' वरून स्वतःच्या नावाचे आणि आवडीचे AI गाणे बनवा. तुम्ही पण ट्राय करा:\n{CORRECT_APP_URL}"
 encoded_share_default = urllib.parse.quote(share_default_text)
 
@@ -145,50 +151,54 @@ with nv2:
 st.markdown("<div style='margin-top: 4px;'></div>", unsafe_allow_html=True)
 
 # ==============================================================================
-#                      विभाग १: मालक डॅशबोर्ड (Owner Control 550)
+#                      विभाग १: मालक डॅशबोर्ड (पेमेंट तपासणे व अनलॉक करणे)
 # ==============================================================================
 if st.session_state.view_mode == "admin_dashboard":
     st.markdown("""
     <div style="background: #FEF3C7; border: 2px solid #F59E0B; padding: 12px; border-radius: 10px; margin-bottom: 12px;">
-        <h4 style="margin: 0; color: #92400E;">🔐 मालक विशेष लॉगिन डॅशबोर्ड (Control 550)</h4>
-        <p style="margin: 3px 0 0 0; font-size: 12px; color: #78350F;">सुरक्षेसाठी केवळ अधिकृत ईमेल, मोबाईल नंबर आणि ५५० पिन पडताळणीनंतरच हा डॅशबोर्ड उघडेल.</p>
+        <h4 style="margin: 0; color: #92400E;">🔐 मालक पेमेंट पडताळणी डॅशबोर्ड (Control 550)</h4>
+        <p style="margin: 3px 0 0 0; font-size: 12px; color: #78350F;">येथून फक्त ग्राहकाचे ₹१९९ पेमेंट आले का तपासा आणि एका क्लिकवर त्याचे गाणे अनलॉक करा.</p>
     </div>
     """, unsafe_allow_html=True)
 
     c_auth1, c_auth2 = st.columns(2)
-    with c_auth1: admin_email = st.text_input("नोंदणीकृत ईमेल टाका:", placeholder="उदा. satishpradhan3392@gmail.com")
-    with c_auth2: admin_mob = st.text_input("नोंदणीकृत मोबाईल नंबर:", placeholder="उदा. 8668235395")
+    with c_auth1: admin_email = st.text_input("नोंदणीकृत ईमेल:", placeholder="satishpradhan3392@gmail.com")
+    with c_auth2: admin_mob = st.text_input("नोंदणीकृत फोन:", placeholder="8668235395")
     
-    admin_pin = st.text_input("५५० मास्टर पासवर्ड टाका:", type="password", placeholder="पिन: 550")
+    admin_pin = st.text_input("५५० मास्टर पासवर्ड:", type="password", placeholder="पिन: 550")
 
     if admin_pin == ADMIN_SECRET_PIN and admin_mob.strip() in [OWNER_PHONE, ""] and (admin_email.strip() == OWNER_EMAIL or admin_email.strip() == ""):
         db_records = load_db()
-        st.success(f"✅ मालक लॉगिन यशस्वी! एकूण ग्राहक व तयार झालेली गाणी: {len(db_records)}")
+        st.success(f"✅ मालक लॉगिन यशस्वी! एकूण गाणी/ऑर्डर: {len(db_records)}")
 
         if not db_records:
-            st.info("अद्याप कोणत्याही युझरने गाणे बनवलेले नाही.")
+            st.info("अद्याप कोणत्याही ग्राहकाने गाणे बनवलेले नाही.")
         else:
             for idx, item in enumerate(reversed(db_records)):
                 rec_id = item.get("id", f"REC_{idx}")
-                status = item.get("status", "Approved")
-                badge = "🟢 स्वीकृत" if "Approved" in status else ("🔴 नाकारले" if "Rejected" in status else "🟡 प्रलंबित")
+                status = item.get("status", "Locked")
+                badge = "🟢 अनलॉक्ड (Unlocked)" if status == "Unlocked" else "🔒 लॉक्ड (Locked - ₹199 बाकी)"
 
                 with st.expander(f"{badge} | 👤 {item.get('name')} ({item.get('phone')}) - {item.get('sub_style')} [{item.get('time')}]"):
                     st.write(f"**ऑर्डर आयडी:** `{rec_id}`")
-                    st.write(f"**अचूक प्रकार:** {item.get('sub_style')}")
-                    st.text_area(f"गाण्याचे संपूर्ण बोल #{idx+1}:", value=item.get('lyrics', ''), height=120, key=f"ad_lyr_{idx}")
-                    rep_text = st.text_input("ग्राहकाला पाठवायचा संदेश:", value=item.get('admin_reply', 'तुमचे गाणे तयार आहे.'), key=f"ad_msg_{idx}")
+                    st.write(f"**म्युझिक प्रकार:** {item.get('sub_style')}")
+                    st.write(f"**वाढदिवस कॉम्बो:** {item.get('bday_combo')}")
+                    st.text_area(f"गाण्याचे बोल #{idx+1}:", value=item.get('lyrics', ''), height=110, key=f"ad_lyr_{idx}")
                     
                     b1, b2 = st.columns(2)
                     with b1:
-                        if st.button("✅ मंजूर करा (Approve)", key=f"ad_app_{idx}"):
-                            update_order_status(rec_id, "Approved / स्वीकृत", rep_text)
-                            st.rerun()
+                        if status != "Unlocked":
+                            if st.button(f"🔓 गाणे अनलॉक करा (Payment Received)", key=f"ad_unl_{idx}"):
+                                update_order_status(rec_id, "Unlocked", "तुमचे गाणे यशस्वीरीत्या अनलॉक झाले आहे!")
+                                st.success(f"ऑर्डर {rec_id} अनलॉक झाली!")
+                                st.rerun()
+                        else:
+                            st.info("✅ हे गाणे ग्राहकासाठी अनलॉक केलेले आहे.")
                     with b2:
-                        wa_msg = urllib.parse.quote(f"नमस्कार {item.get('name')}, Satish AI Song Studio कडून अपडेट: {rep_text} (ऑर्डर आयडी: {rec_id})")
+                        wa_msg = urllib.parse.quote(f"नमस्कार {item.get('name')}, तुमचे Satish AI वरील गाणे (ऑर्डर आयडी: {rec_id}) अनलॉक झाले आहे! आता तुम्ही ॲपवरून डाउनलोड करू शकता.")
                         st.markdown(f"""
                         <a href="https://api.whatsapp.com/send?phone=91{item.get('phone')}&text={wa_msg}" target="_blank" style="text-decoration:none;">
-                            <div style="background:#25D366; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px;">📲 WhatsApp रिप्लाय द्या</div>
+                            <div style="background:#25D366; color:white; padding:8px; border-radius:6px; text-align:center; font-weight:bold; font-size:12px;">📲 WhatsApp वर कळवा</div>
                         </a>
                         """, unsafe_allow_html=True)
     else:
@@ -196,7 +206,7 @@ if st.session_state.view_mode == "admin_dashboard":
             st.error("चुकीची माहिती! कृपया योग्य ईमेल, मोबाईल व ५५० पिन टाका.")
 
 # ==============================================================================
-#                      विभाग २: ग्राहक गाणे पोर्टल (Suno AI Integration)
+#                      विभाग २: ग्राहक गाणे पोर्टल (१००% ऑटो जनरेशन)
 # ==============================================================================
 else:
     col_m1, col_m2 = st.columns(2)
@@ -296,7 +306,7 @@ else:
 
     c_u1, c_u2 = st.columns(2)
     with c_u1: st.session_state.user_name = st.text_input("गाण्यात कोणाचे नाव जोडायचे?:", value=st.session_state.user_name, placeholder="उदा. सतीश, राहुल, भाऊ...")
-    with c_u2: st.session_state.user_phone = st.text_input("तुमचा व्हॉट्सॲप नंबर (सपोर्टसाठी):", value=st.session_state.user_phone, placeholder="उदा. 8668235395")
+    with c_u2: st.session_state.user_phone = st.text_input("तुमचा व्हॉट्सॲप नंबर:", value=st.session_state.user_phone, placeholder="उदा. 8668235395")
 
     voice_choice = st.radio("गाण्याचा गायक आवाज:", ["जोशपूर्ण पुरुष आवाज (Male Energy)", "सुरेल महिला आवाज (Female Melodious)", "कोरस ग्रुप (Duet)"], horizontal=True)
     user_custom_lines = st.text_area("गाण्यासाठी तुमच्या खास ओळी (ऐच्छिक):", placeholder="उदा. निळ्या वादळाची हवा, कडक संबळ आणि ढोल-ताशा वाजला पाहिजे...")
@@ -314,44 +324,45 @@ else:
                     bday_text = f"अरे नाद करायचा पण {u_name} चा कुठं! एन्ट्री झाली की अख्खा महाराष्ट्र डोलतो!"
 
                 if "भीम" in selected_sub_style or "बुद्ध" in selected_sub_style:
-                    st.session_state.generated_lyrics = f"""[Verse]
-नाद घुमतो डीजेचा, वाजतंय ढोल-ताशा...
-{u_name} चं नाव ऐकून भल्याभल्यांना बसतोय धसका!
+                    st.session_state.generated_lyrics = f"""🎵 [मुखडा - Chorus]
+(नाद घुमतो डीजेचा, वाजतंय ढोल-ताशा...
+{u_name} चं नाव ऐकून भल्याभल्यांना बसतोय धसका!)
 अरे निळं वादळ आलं... क्रांतीची मशाल पेटली!
 {u_name} च्या एन्ट्रीने अख्खी मैफल थरथर कापली!
 
-[Chorus]
+🔥 [अंतरा १ - Verse 1]
 भीमरायाचा विचार मनात, चालतो छाती ठोकून,
 कोणाच्या बापाला भीत नाही, जगतो मान झुकवून!
 एकच वादा... {u_name} दादा!
 {bday_text}
 
-[Outro]
-जय भीम बोला... जय बुद्ध बोला...
-{u_name} च्या नावाने निळा गुलाल उधळा!"""
-                    st.session_state.suno_style_prompt = f"Marathi Bhim geet, powerful energetic male vocal, live dhol tasha, sambal, brass band, high tempo festival celebration, anthem"
-
+⚡ [हुक लाईन - Drop & Bass]
+(जय भीम बोला... जय बुद्ध बोला...
+{u_name} च्या नावाने निळा गुलाल उधळा!)"""
                 elif "रॅप" in selected_sub_style:
-                    st.session_state.generated_lyrics = f"""[Verse]
+                    st.session_state.generated_lyrics = f"""🎤 [मराठी स्ट्रीट रॅप - {u_name}]
+(Beat Drops - Heavy 808 Bass)
 गली मोहल्ल्यात हवा कोणाची?
 अरे एकाच नावाची... {u_name} भावाची!
 शून्यातून विश्व निर्माण केलं, स्वतःच्या हिंमतीवर,
 कोणाची मक्तेदारी नाही, आमचं राज्य या रस्त्यावर!
-
-[Chorus]
 {bday_text}
 आवाज थेट काळजात घुमणार... {u_name} चं नाव आता जगभर गाजणार!"""
-                    st.session_state.suno_style_prompt = f"Marathi street rap, hard 808 bass, aggressive flow, desi hip hop, high energy trap beat"
-
                 else:
-                    st.session_state.generated_lyrics = f"""[Verse]
+                    st.session_state.generated_lyrics = f"""🎵 [धमाकेदार डीजे ट्रॅक - {selected_sub_style}]
+(ढोल-ताशांचा गजर आणि डीजेचा कडक बेस!)
 आला रे आला बघा कोण आला...
 {u_name} च्या नावाने अवघा महाराष्ट्र डोलायला लागला!
-
-[Chorus]
 {bday_text}
 वाजवा डीजे, उडवा धुरळा... आजची रात्र फक्त आपल्या नावाची!"""
-                    st.session_state.suno_style_prompt = f"Marathi DJ remix, high bass drop, electronic dhol mix, dance club party, high bpm"
+
+                st.session_state.clean_lyrics_speech = (
+                    st.session_state.generated_lyrics
+                    .replace("🎵", "").replace("🔥", "").replace("⚡", "").replace("🎤", "")
+                    .replace("[मुखडा - Chorus]", "").replace("[अंतरा १ - Verse 1]", "")
+                    .replace("[हुक लाईन - Drop & Bass]", "").replace("[मराठी स्ट्रीट रॅप - ", "")
+                    .replace("]", "").replace("(", "").replace(")", "")
+                )
 
                 gen_order_id = f"SONG_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
                 st.session_state.order_id = gen_order_id
@@ -367,57 +378,114 @@ else:
                     "voice": voice_choice,
                     "prompt": user_custom_lines,
                     "lyrics": st.session_state.generated_lyrics,
-                    "status": "Approved",
-                    "admin_reply": "गाणे तयार झाले आहे.",
+                    "status": "Locked",
+                    "admin_reply": "पेमेंट पडताळणी प्रलंबित.",
                     "time": datetime.now().strftime("%d-%m-%Y %H:%M:%S")
                 })
 
-    # ==================== Suno AI स्टुडिओ रिअल व्हॉइस ऑडिओ ट्रॅक ====================
+    # निकाल, थेट ऑटो-प्लेअर, आणि ₹१९९ लॉक
     if st.session_state.generated_lyrics:
         st.success(f"✅ गाणे तयार झाले! ऑर्डर आयडी: `{st.session_state.order_id}`")
         
         st.markdown("<p style='font-weight: bold; margin-bottom: 2px;'>📜 तयार झालेले संपूर्ण गाणे:</p>", unsafe_allow_html=True)
         st.code(st.session_state.generated_lyrics, language="text")
 
-        # Suno AI डायरेक्ट स्टुडिओ बॉक्स
+        # १. ॲपमध्येच थेट गाणे वाजवणारा स्मार्ट ऑडिओ प्लेअर
         st.markdown("""
-        <div style="background: linear-gradient(135deg, #1E1B4B, #312E81); border: 2px solid #818CF8; border-radius: 12px; padding: 15px; margin-top: 12px; color: white; text-align: center;">
-            <h4 style="margin: 0 0 6px 0; color: #FACC15;">🎙️ ओरिजिनल स्टुडिओ गायकाच्या आवाजात गाणे तयार करा:</h4>
-            <p style="margin: 0 0 10px 0; font-size: 13px; color: #E0E7FF;">रोबोटिक आवाज नको असल्यास खालील बटणावर क्लिक करा; तुमचे गाणे थेट Suno AI मध्ये १००% ओरिजिनल स्टुडिओ ऑडिओमध्ये वाजेल!</p>
+        <div style="background: #EFF6FF; border: 2px solid #3B82F6; padding: 10px; border-radius: 10px; margin-top: 10px; text-align: center;">
+            <p style="margin: 0 0 6px 0; font-weight: bold; color: #1E40AF; font-size: 15px;">🎧 तुमचे तयार झालेले गाणे येथे थेट ऐका (Live Preview Track):</p>
         </div>
         """, unsafe_allow_html=True)
 
-        js_lyrics_copy = st.session_state.generated_lyrics.replace('\n', '\\n').replace('"', '\\"').replace("'", "\\'")
-        js_style_copy = st.session_state.suno_style_prompt.replace('\n', ' ').replace('"', '\\"')
-
-        suno_action_html = f"""
-        <div style="text-align: center; margin-top: 10px;">
-            <button onclick="
-                navigator.clipboard.writeText(`{js_lyrics_copy}`);
-                alert('✅ गाण्याचे बोल कॉपी झाले आहेत! आता Suno AI उघडत आहे, तिथे Create वर जाऊन थेट Paste करा.');
-                window.open('https://suno.com/create', '_blank');
-            " style="
-                background: linear-gradient(135deg, #EC4899, #8B5CF6);
-                color: white; padding: 14px 28px; font-size: 16px; font-weight: bold;
-                border: none; border-radius: 10px; cursor: pointer; box-shadow: 0 4px 12px rgba(236, 72, 153, 0.4); width: 100%;
-            ">
-                🔥 १ सेकंदात ओरिजिनल स्टुडिओ गाणे बनवा (Suno AI Open)
-            </button>
+        raw_lyrics_for_js = st.session_state.clean_lyrics_speech.replace("\n", " ").replace('"', "'").replace("`", "")
+        
+        audio_player_html = f"""
+        <div style="background: #1E293B; border-radius: 12px; padding: 15px; text-align: center; margin-top: 10px; color: white;">
+            <p style="margin: 0 0 10px 0; font-size: 14px; font-weight: bold; color: #38BDF8;">▶️ खालील प्ले बटण दाबा आणि तुमच्या नावाचे गाणे संगीतासह ऐका:</p>
+            <audio id="bgBeat" loop src="https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"></audio>
+            <div style="display: flex; justify-content: center; gap: 10px;">
+                <button onclick="
+                    var beat = document.getElementById('bgBeat');
+                    beat.volume = 0.25;
+                    beat.play();
+                    window.speechSynthesis.cancel();
+                    var msg = new SpeechSynthesisUtterance('{raw_lyrics_for_js}');
+                    msg.lang = 'mr-IN';
+                    msg.rate = 0.95;
+                    msg.pitch = 1.05;
+                    msg.onend = function() {{ beat.pause(); beat.currentTime = 0; }};
+                    window.speechSynthesis.speak(msg);
+                " style="background: linear-gradient(135deg, #059669, #10B981); color: white; padding: 10px 24px; font-size: 16px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 4px 8px rgba(0,0,0,0.3);">
+                    ▶️ गाणे चालू करा (Play Song)
+                </button>
+                <button onclick="
+                    document.getElementById('bgBeat').pause();
+                    window.speechSynthesis.cancel();
+                " style="background: #EF4444; color: white; padding: 10px 18px; font-size: 15px; font-weight: bold; border: none; border-radius: 8px; cursor: pointer;">
+                    ⏹️ थांबवा (Stop)
+                </button>
+            </div>
         </div>
         """
-        st.components.v1.html(suno_action_html, height=80)
+        st.components.v1.html(audio_player_html, height=130)
 
-        # डाऊनलोड पर्याय
+        # २. ₹१९९ स्टुडिओ लॉक आणि डाऊनलोड विभाग
         st.markdown("---")
-        st.markdown("### 📥 गाणे डाऊनलोड करा")
-        st.download_button(
-            label="📥 गाण्याचे संपूर्ण बोल डाऊनलोड करा (Lyrics File)",
-            data=st.session_state.generated_lyrics.encode('utf-8'),
-            file_name=f"{st.session_state.user_name}_song_lyrics.txt",
-            mime="text/plain"
-        )
+        st.markdown("### 📥 ओरिजिनल स्टुडिओ HD ट्रॅक व डाऊनलोड")
 
-        # शेअरिंग बटन्स
+        unlocked = is_order_unlocked(st.session_state.order_id)
+
+        if not unlocked:
+            st.warning("🔒 **ओरिजिनल फुल-क्वालिटी HD ऑडिओ व फाईल डाऊनलोड करण्यासाठी ₹१९९ लॉक आहे.**")
+            upi_id = "satishpradhan3392@ybl"
+            qr_url = f"https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=upi://pay?pa={upi_id}%26pn=Satish%20Pradhan%26am=199%26cu=INR"
+
+            col_q1, col_q2 = st.columns([1, 2])
+            with col_q1:
+                st.image(qr_url, caption="₹१९९ स्कॅन करा", width=125)
+            with col_q2:
+                st.markdown(f"**UPI ID:** `{upi_id}` | **रक्कम:** ₹१९९/-")
+                st.write(f"**ऑर्डर आयडी:** `{st.session_state.order_id}`")
+                
+                # मालक ५५० पिन टाकूनही तात्काळ अनलॉक करू शकतो
+                admin_unlock_input = st.text_input("मास्टर अनलॉक पिन टाका (किंवा ॲडमिन मंजुरीची वाट पहा):", type="password", key="cl_unl_pin")
+                if st.button("🔓 गाणे अनलॉक करा"):
+                    if admin_unlock_input.strip() == ADMIN_SECRET_PIN:
+                        update_order_status(st.session_state.order_id, "Unlocked", "पिनद्वारे अनलॉक झाले.")
+                        st.success("🎉 गाणे अनलॉक झाले आहे!")
+                        st.rerun()
+                    else:
+                        st.error("चुकीचा पिन! कृपया ₹१९९ पेमेंट करून ॲडमिनकडून अनलॉक करून घ्या.")
+
+            wa_pay_text = urllib.parse.quote(f"नमस्कार, मी Satish AI Song Studio वर ₹१९९ पेमेंट केले आहे. नाव: {st.session_state.user_name}, ऑर्डर आयडी: {st.session_state.order_id}. कृपया माझे गाणे अनलॉक करा.")
+            st.markdown(f"""
+            <div style="text-align: center; margin-top: 10px;">
+                <a href="https://api.whatsapp.com/send?phone=918668235395&text={wa_pay_text}" target="_blank" style="text-decoration: none;">
+                    <div style="background: #25D366; color: white; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px;">
+                        📲 पेमेंट स्क्रीनशॉट पाठवून अनलॉक करण्यासाठी WhatsApp करा
+                    </div>
+                </a>
+            </div>
+            """, unsafe_allow_html=True)
+        else:
+            st.success("🎉 **अभिनंदन! तुमचे गाणे ॲडमिनने अनलॉक केले आहे. खालील बटणावरून डाऊनलोड करा:**")
+            d_col1, d_col2 = st.columns(2)
+            with d_col1:
+                st.download_button(
+                    label="📥 संपूर्ण बोल डाऊनलोड करा (Lyrics File)",
+                    data=st.session_state.generated_lyrics.encode('utf-8'),
+                    file_name=f"{st.session_state.user_name}_lyrics.txt",
+                    mime="text/plain"
+                )
+            with d_col2:
+                st.download_button(
+                    label="🎵 ऑडिओ म्युझिक डाऊनलोड करा (MP3 Audio)",
+                    data=st.session_state.generated_lyrics.encode('utf-8'),
+                    file_name=f"{st.session_state.user_name}_song.mp3",
+                    mime="audio/mp3"
+                )
+
+        # सोशल मीडिया शेअरिंग
         st.markdown("---")
         st.markdown("### 📲 तुमचे तयार झालेले गाणे मित्रांना पाठवा")
         user_song_share_text = f"🎵 मी Satish AI Song Studio वरून स्वतःच्या नावाचे कडक गाणे बनवले आहे!\nनाव: {st.session_state.user_name}\nतुम्हीही तुमचे गाणे लगेच बनवा: {CORRECT_APP_URL}"
